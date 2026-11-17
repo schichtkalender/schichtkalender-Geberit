@@ -108,7 +108,7 @@ const clientReady = SUPABASE_URL.startsWith("https://") &&
 
 const db = clientReady ? supabase.createClient(SUPABASE_URL,SUPABASE_KEY) : null;
 
- const VAPID_PUBLIC_KEY = "BFbvrhanVDyWOqhoRqytzpgIQG6VMR0zFtlyxShRo5xPaFZwuyoDJmx3vzYmV8QqtpMx0go6sUVhSAW8dzuJwM0";
+ const VAPID_PUBLIC_KEY = "BCCtAk6g2klTyAevrJLyX7z0f5QXy-tj4uI7y5HBP7ArLmek6kxXYrcE0KBCsPm7_xro5WZM_bl3ZTrKoR7bvxM";
 
 function urlBase64ToUint8Array(base64String) {
   const padding = "=".repeat((4 - base64String.length % 4) % 4);
