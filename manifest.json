@@ -1,9 +1,10 @@
+
 {
-  "name": "Schichtkalender 2027",
-  "short_name": "Schichtkalender",
-  "description": "Dein persönlicher Schichtkalender",
-  "start_url": "/schichtkalender-2027/",
-  "scope": "/schichtkalender-2027/",
+  "name": "Geberit Schichtkalender",
+  "short_name": "Geberit",
+  "description": "Geberit Schichtkalender 2026–2054",
+  "start_url": "/schichtkalender-Geberit/",
+  "scope": "/schichtkalender-Geberit/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#2563eb",
