@@ -1,0 +1,664 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Schichtkalender schicht Kohpa</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{font-family:system-ui,sans-serif;color:#202938;background:#f4f6fa}
+body{max-width:950px;margin:auto;padding:14px}
+h1{font-size:1.65rem}
+.panel{background:white;padding:15px;border-radius:14px;margin:12px 0;box-shadow:0 2px 9px #0001}
+button,input,textarea,select{font:inherit;padding:9px;border:1px solid #cbd2dc;border-radius:7px}
+button{cursor:pointer;background:#eef2f7;margin:3px}
+.primary{background:#263e70;color:white}
+input,textarea{box-sizing:border-box;max-width:100%;width:100%;margin:5px 0}
+.top{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+.grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.day{min-width:0;min-height:76px;padding:4px 2px;border:1px solid #e0e4eb;border-radius:7px;background:white;overflow-wrap:anywhere;font-size:.82rem}
+.day b{display:block;font-size:1rem}
+.day small{display:block;font-size:.68rem}
+.N{background:#dce6ff}
+.M{background:#ffead7}
+.F{background:#d9f4e5}
+.weekend{background:#e9edf1;color:#687386}
+.holiday{border:2px solid #c14a4a}
+.selected{outline:3px solid #576fbc}
+.muted{color:#657184;font-size:.9rem}
+.danger{color:#a52b2b}
+.shared-info{display:block;background:#ffdddd;color:#000;border-left:4px solid #c62828;padding:5px;margin-top:4px;border-radius:4px;white-space:normal}
+#dayInfo .shared-info{padding:10px;margin:8px 0}
+@media(max-width:450px){
+ body{padding:6px}
+ .day{min-height:68px;font-size:.72rem}
+ .day small{font-size:.62rem}
+ .panel{padding:10px}
+}
+</style>
+ <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2563eb">
+</head>
+<body>
+<h1>📅 Schichtkalender Schicht Kohpa</h1>
+<p class="muted">N = Nacht · M = Spät · F = Früh · Montag bis Freitag</p>
+<div class="panel">
+  <h3>Push-Benachrichtigungen</h3>
+  <p class="muted">Erhalte eine Nachricht, wenn der Schichtkalender geändert wird.</p>
+  <button class="primary" id="enablePush">Benachrichtigungen aktivieren</button>
+  <p id="pushStatus" class="muted"></p>
+</div>
+ 
+<div class="panel">
+  <div class="top">
+    <button id="prev">◀ Zurück</button>
+    <h2 id="monthTitle"></h2>
+    <button id="next">Weiter ▶</button>
+  </div>
+  <div id="calendar" class="grid"></div>
+  <p id="status" class="muted">Kalender wird geladen …</p>
+</div>
+
+<div class="panel">
+  <h3>Monatsübersicht</h3>
+  <div id="counts"></div>
+  <button id="csv">Monat als CSV exportieren</button>
+</div>
+
+<div class="panel">
+  <h3 id="selectedTitle">Tag auswählen</h3>
+  <div id="dayInfo">Tippe auf einen Kalendertag, um Details zu sehen.</div>
+  <div id="admin" hidden>
+    <label for="shift">Schicht für diesen Tag</label>
+    <select id="shift">
+      <option value="">Automatischen Plan verwenden</option>
+      <option value="N">N – Nachtschicht</option>
+      <option value="M">M – Spätschicht</option>
+      <option value="F">F – Frühschicht</option>
+    </select>
+    <label for="info">Gemeinsame Schichtinfo (für Mitarbeiter sichtbar)</label>
+    <textarea id="info" rows="3" placeholder="z. B. Schichtbesprechung, Uhrzeit, Schichttausch"></textarea>
+    <button class="primary" id="save">Änderung speichern</button>
+    <button id="reset">Automatischen Plan wiederherstellen</button>
+  </div>
+</div>
+
+<div class="panel">
+  <h3>Anmeldung für Administratoren und Editoren</h3>
+  <p class="muted">Mitarbeiter können den Kalender ohne Anmeldung ansehen. Änderungen sind durch die Supabase-Datenbankregeln geschützt.</p>
+  <div id="login">
+    <input id="email" type="email" placeholder="Deine E-Mail-Adresse" autocomplete="username">
+    <input id="password" type="password" placeholder="Passwort" autocomplete="current-password">
+    <button class="primary" id="signIn">Anmelden</button>
+  </div>
+  <div id="loggedIn" hidden>
+    <p>Du bist angemeldet.</p>
+    <button id="signOut">Abmelden</button>
+  </div>
+  <p id="authStatus" class="muted"></p>
+</div>
+
+<script>
+const SUPABASE_URL = "https://uvskcvpghxxzgcqjmkmt.supabase.co";
+const SUPABASE_KEY = "sb_publishable_9ITj_ZcBVgB8UinKXrej0g_S8BROev4";
+
+const FIRST_YEAR = 2027;
+const LAST_YEAR = 2095;
+const START_DATE = "2027-01-04";
+const MONTHS = ["Januar","Februar","März","April","Mai","Juni","Juli","August","September","Oktober","November","Dezember"];
+
+const clientReady = SUPABASE_URL.startsWith("https://") &&
+  !SUPABASE_URL.includes("HIER_") &&
+  SUPABASE_KEY.startsWith("sb_publishable_");
+
+const db = clientReady ? supabase.createClient(SUPABASE_URL,SUPABASE_KEY) : null;
+
+ const VAPID_PUBLIC_KEY = "BFbvrhanVDyWOqhoRqytzpgIQG6VMR0zFtlyxShRo5xPaFZwuyoDJmx3vzYmV8QqtpMx0go6sUVhSAW8dzuJwM0";
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = "=".repeat((4 - base64String.length % 4) % 4);
+  const base64 = (base64String + padding)
+    .replace(/-/g, "+")
+    .replace(/_/g, "/");
+  const rawData = atob(base64);
+  return Uint8Array.from(rawData, char => char.charCodeAt(0));
+}
+ async function enablePush() {
+  const status = $("pushStatus");
+
+  try {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) {
+      throw new Error("Push-Nachrichten werden auf diesem Gerät nicht unterstützt.");
+    }
+
+    status.textContent = "Bitte Benachrichtigungen erlauben …";
+
+    const permission = await Notification.requestPermission();
+    if (permission !== "granted") {
+      throw new Error("Benachrichtigungen wurden nicht erlaubt.");
+    }
+
+    const registration = await navigator.serviceWorker.ready;
+
+    let subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+      });
+    }
+
+    const response = await fetch(
+      SUPABASE_URL + "/functions/v1/push-notify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY
+        },
+        body: JSON.stringify({
+          action: "subscribe",
+          subscription: subscription.toJSON()
+        })
+      }
+    );
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Anmeldung fehlgeschlagen.");
+    }
+
+    status.textContent = "Push-Benachrichtigungen sind aktiviert!";
+  } catch (error) {
+    status.textContent = "Fehler: " + error.message;
+  }
+ }
+let year = FIRST_YEAR;
+let month = 0;
+let selected = null;
+let user = null;
+let shifts = {};
+let infos = {};
+
+const $ = id => document.getElementById(id);
+const keyDate = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+const dateFrom = s => new Date(s+"T12:00:00");
+const weekday = d => (d.getDay()+6)%7;
+const isWeekend = d => d.getDay()===0 || d.getDay()===6;
+const infoOf = s => infos[s]?.info || "";
+const pretty = s => dateFrom(s).toLocaleDateString("de-DE",{day:"2-digit",month:"long",year:"numeric"});
+
+/* Berechnet Ostersonntag nach dem gregorianischen Kalender. */
+function easterSunday(y){
+  const a=y%19, b=Math.floor(y/100), c=y%100;
+  const d=Math.floor(b/4), e=b%4;
+  const f=Math.floor((b+8)/25);
+  const g=Math.floor((b-f+1)/3);
+  const h=(19*a+b-d-g+15)%30;
+  const i=Math.floor(c/4), k=c%4;
+  const l=(32+2*e+2*i-h-k)%7;
+  const m=Math.floor((a+11*h+22*l)/451);
+  const month=Math.floor((h+l-7*m+114)/31);
+  const day=((h+l-7*m+114)%31)+1;
+  return new Date(y,month-1,day,12);
+}
+
+function addDays(d,n){
+  const result=new Date(d);
+  result.setDate(result.getDate()+n);
+  return result;
+}
+
+function holidaysForYear(y){
+  const easter=easterSunday(y);
+  const entries=[
+    [`${y}-01-01`,"Neujahr"],
+    [`${y}-01-06`,"Heilige Drei Könige"],
+    [keyDate(addDays(easter,-2)),"Karfreitag"],
+    [keyDate(addDays(easter,1)),"Ostermontag"],
+    [`${y}-05-01`,"Tag der Arbeit"],
+    [keyDate(addDays(easter,39)),"Christi Himmelfahrt"],
+    [keyDate(addDays(easter,50)),"Pfingstmontag"],
+    [keyDate(addDays(easter,60)),"Fronleichnam"],
+    [`${y}-10-03`,"Tag der Deutschen Einheit"],
+    [`${y}-11-01`,"Allerheiligen"],
+    [`${y}-12-25`,"1. Weihnachtstag"],
+    [`${y}-12-26`,"2. Weihnachtstag"]
+  ];
+  return Object.fromEntries(entries);
+}
+
+function holidayOf(s){
+  return holidaysForYear(Number(s.slice(0,4)))[s] || "";
+}
+
+/* Die Schichtfolge zählt nur Montag bis Freitag.
+   04.01.2027 = N; danach jeweils fünf Arbeitstage pro Schicht. */
+function automaticShift(s){
+  const d=dateFrom(s);
+  const start=dateFrom(START_DATE);
+  if(d<start || isWeekend(d)) return "";
+
+  let workdays=0;
+  for(let x=new Date(start);x<d;x.setDate(x.getDate()+1)){
+    if(!isWeekend(x)) workdays++;
+  }
+  return ["N","M","F"][Math.floor(workdays/5)%3];
+}
+
+function shiftOf(s){
+  if(Object.hasOwn(shifts,s)){
+    return shifts[s].schicht || "";
+  }
+  return automaticShift(s);
+}
+
+async function loadData(){
+  if(!db){
+    $("status").textContent="Supabase ist nicht richtig konfiguriert.";
+    return;
+  }
+  try{
+    const a=await db.from("schicht_eintraege").select("datum,schicht");
+    if(a.error) throw a.error;
+    shifts={};
+    (a.data||[]).forEach(r=>shifts[r.datum]=r);
+
+    const b=await db.from("schicht_infos").select("datum,info");
+    if(b.error) throw b.error;
+    infos={};
+    (b.data||[]).forEach(r=>infos[r.datum]=r);
+
+    $("status").textContent="Schichten und gemeinsame Infos geladen.";
+  }catch(e){
+    $("status").textContent="Laden fehlgeschlagen: "+e.message;
+  }
+  render();
+}
+
+function render(){
+  $("monthTitle").textContent=MONTHS[month]+" "+year;
+  const first=new Date(year,month,1);
+  const last=new Date(year,month+1,0);
+  const cal=$("calendar");
+  cal.replaceChildren();
+
+  ["Mo","Di","Mi","Do","Fr","Sa","So"].forEach(t=>{
+    const e=document.createElement("div");
+    e.textContent=t;
+    e.className="muted";
+    cal.append(e);
+  });
+
+  for(let i=0;i<weekday(first);i++){
+    cal.append(document.createElement("div"));
+  }
+
+   const privateTermine = privateTermineLaden();
+ 
+  for(let n=1;n<=last.getDate();n++){
+    const d=new Date(year,month,n);
+    const s=keyDate(d);
+    const sh=shiftOf(s);
+    const holiday=holidayOf(s);
+    const info=infoOf(s);
+    const e=document.createElement("button");
+
+    e.className="day "+(isWeekend(d)?"weekend":sh);
+    if(holiday)e.classList.add("holiday");
+    if(selected===s)e.classList.add("selected");
+
+    const num=document.createElement("b");
+    num.textContent=n;
+    e.append(num);
+
+    const label=document.createElement("small");
+    label.textContent=isWeekend(d)?"Wochenende":(sh||"—");
+    e.append(label);
+       privateTermine
+      .filter(t => t.datum === s)
+      .forEach(t => {
+        const privat = document.createElement("small");
+        privat.textContent = "🔒 " + t.titel;
+        privat.style.display = "block";
+        e.append(privat);
+      });
+
+    if(holiday){
+      const h=document.createElement("small");
+      h.textContent=holiday;
+      e.append(h);
+    }
+
+    if(info){
+      const inf=document.createElement("small");
+      inf.className="shared-info";
+      inf.textContent="ℹ "+info;
+      e.append(inf);
+    }
+
+    e.addEventListener("click",()=>selectDay(s));
+    cal.append(e);
+  }
+
+  const c={N:0,M:0,F:0};
+  for(let n=1;n<=last.getDate();n++){
+    const s=keyDate(new Date(year,month,n));
+    const sh=shiftOf(s);
+    if(c[sh]!==undefined)c[sh]++;
+  }
+  $("counts").textContent=`N: ${c.N} · M: ${c.M} · F: ${c.F} Arbeitstage`;
+}
+
+function selectDay(s){
+  selected=s;
+  const d=dateFrom(s);
+  const sh=shiftOf(s);
+  const info=infoOf(s);
+  const dayInfo=$("dayInfo");
+  dayInfo.replaceChildren();
+
+  const details=[
+    isWeekend(d)?"Wochenende":`Schicht: ${sh||"keine"}`,
+    holidayOf(s)
+  ].filter(Boolean).join(" · ");
+
+  const summary=document.createElement("div");
+  summary.textContent=details||"Keine Zusatzinfo";
+  dayInfo.append(summary);
+
+  if(info){
+    const shared=document.createElement("div");
+    shared.className="shared-info";
+    shared.textContent="Gemeinsame Schichtinfo: "+info;
+    dayInfo.append(shared);
+  }
+
+  $("selectedTitle").textContent=pretty(s);
+  $("admin").hidden=!user;
+
+  // Leer bedeutet: automatischen Schichtplan verwenden.
+  $("shift").value=Object.hasOwn(shifts,s)?(shifts[s].schicht||""):"";
+  $("info").value=info;
+  render();
+}
+
+async function save(){
+  if(!user||!selected)return;
+  const sh=$("shift").value;
+  const info=$("info").value.trim();
+
+  try{
+    let result;
+    if(sh){
+      result=await db.from("schicht_eintraege")
+        .upsert({datum:selected,schicht:sh},{onConflict:"datum"});
+    }else{
+      result=await db.from("schicht_eintraege")
+        .delete().eq("datum",selected);
+    }
+    if(result.error)throw result.error;
+
+    const infResult=info
+      ? await db.from("schicht_infos").upsert({datum:selected,info},{onConflict:"datum"})
+      : await db.from("schicht_infos").delete().eq("datum",selected);
+
+    if(infResult.error)throw infResult.error;
+
+    $("status").textContent="Änderungen gespeichert.";
+    await loadData();
+    selectDay(selected);
+  }catch(e){
+    $("status").textContent="Speichern fehlgeschlagen: "+e.message;
+  }
+}
+
+async function resetDay(){
+  if(!user||!selected)return;
+  try{
+    const a=await db.from("schicht_eintraege").delete().eq("datum",selected);
+    if(a.error)throw a.error;
+    const b=await db.from("schicht_infos").delete().eq("datum",selected);
+    if(b.error)throw b.error;
+    await loadData();
+    selectDay(selected);
+  }catch(e){
+    $("status").textContent="Zurücksetzen fehlgeschlagen: "+e.message;
+  }
+}
+
+function exportCSV(){
+  const last=new Date(year,month+1,0);
+  const rows=[["Datum","Wochentag","Schicht","Feiertag","Schichtinfo"]];
+
+   const privateTermine = privateTermineLaden();
+  for(let n=1;n<=last.getDate();n++){
+    const d=new Date(year,month,n);
+    const s=keyDate(d);
+    rows.push([
+      s,
+      d.toLocaleDateString("de-DE",{weekday:"long"}),
+      isWeekend(d)?"":shiftOf(s),
+      holidayOf(s),
+      infoOf(s)
+    ]);
+  }
+
+  const csv="\uFEFF"+rows.map(r=>
+    r.map(v=>'"'+String(v).replaceAll('"','""')+'"').join(";")
+  ).join("\r\n");
+
+  const url=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));
+  const a=document.createElement("a");
+  a.href=url;
+  a.download=`Schichtkalender-${year}-${String(month+1).padStart(2,"0")}.csv`;
+  a.click();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+}
+
+async function updateAuth(){
+  if(!db)return;
+  const r=await db.auth.getSession();
+  user=r.data.session?.user||null;
+  $("login").hidden=!!user;
+  $("loggedIn").hidden=!user;
+  if(selected)selectDay(selected);
+  else $("admin").hidden=!user;
+}
+
+function moveMonth(delta){
+  const next=new Date(year,month+delta,1);
+  if(next.getFullYear()<FIRST_YEAR || next.getFullYear()>LAST_YEAR){
+    $("status").textContent=`Der Kalender reicht von ${FIRST_YEAR} bis ${LAST_YEAR}.`;
+    return;
+  }
+  year=next.getFullYear();
+  month=next.getMonth();
+  selected=null;
+  $("selectedTitle").textContent="Tag auswählen";
+  $("dayInfo").textContent="Tippe auf einen Kalendertag, um Details zu sehen.";
+  $("admin").hidden=true;
+  render();
+}
+
+$("prev").onclick=()=>moveMonth(-1);
+$("enablePush").onclick=enablePush;
+ 
+$("next").onclick=()=>moveMonth(1);
+ let touchStartX = 0;
+let touchStartY = 0;
+
+$("calendar").addEventListener("touchstart", e => {
+  touchStartX = e.changedTouches[0].screenX;
+  touchStartY = e.changedTouches[0].screenY;
+}, { passive: true });
+
+$("calendar").addEventListener("touchend", e => {
+  const diffX = e.changedTouches[0].screenX - touchStartX;
+  const diffY = e.changedTouches[0].screenY - touchStartY;
+
+  if (Math.abs(diffX) > 70 && Math.abs(diffX) > Math.abs(diffY) * 1.3) {
+    if (diffX < 0) {
+      moveMonth(1);
+    } else {
+      moveMonth(-1);
+    }
+  }
+}, { passive: true });
+$("csv").onclick=exportCSV;
+$("save").onclick=save;
+$("reset").onclick=resetDay;
+
+$("signIn").onclick=async()=>{
+  if(!db){
+    $("authStatus").textContent="Supabase ist nicht richtig konfiguriert.";
+    return;
+  }
+
+  const login=$("email").value.trim().toLowerCase();
+  const password=$("password").value;
+
+  const email = {
+    "kohpa": "kohpa@login.schichtkalender.invalid",
+    "bruma": "bruma@login.schichtkalender.invalid"
+  }[login] || login;
+
+  const {error}=await db.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  $("authStatus").textContent=error
+    ? "Anmeldung fehlgeschlagen: Benutzername oder Passwort prüfen."
+    : "Anmeldung erfolgreich.";
+
+  await updateAuth();
+  await loadData();
+};
+
+$("signOut").onclick=async()=>{
+  if(db)await db.auth.signOut();
+  user=null;
+  await updateAuth();
+  render();
+};
+
+render();
+if(db){
+  db.auth.onAuthStateChange(()=>{updateAuth()});
+   updateAuth();
+  loadData();
+}
+ // Privater Kalender – Speicherung nur auf diesem Gerät
+function privateTermineLaden() {
+  return JSON.parse(localStorage.getItem("meine_private_termine") || "[]");
+}
+
+function privateTermineAnzeigen() {
+  const liste = document.getElementById("privatTerminListe");
+  if (!liste) return;
+
+  const termine = privateTermineLaden();
+  liste.innerHTML = "";
+
+  termine.forEach((termin, index) => {
+    const eintrag = document.createElement("div");
+    eintrag.className = "panel";
+    eintrag.textContent =
+      termin.datum + " – " + termin.titel +
+      (termin.notiz ? " – " + termin.notiz : "");
+
+    const loeschen = document.createElement("button");
+    loeschen.textContent = "Löschen";
+    loeschen.onclick = () => {
+      const aktuell = privateTermineLaden();
+      aktuell.splice(index, 1);
+      localStorage.setItem("meine_private_termine", JSON.stringify(aktuell));
+      privateTermineAnzeigen();
+    };
+
+    eintrag.appendChild(loeschen);
+    liste.appendChild(eintrag);
+  });
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  document.getElementById("privatSpeichern").addEventListener("click", () => {
+  const datum = document.getElementById("privatDatum").value;
+  const titel = document.getElementById("privatTitel").value.trim();
+  const notiz = document.getElementById("privatNotiz").value.trim();
+
+  if (!datum || !titel) {
+    alert("Bitte Datum und Titel eingeben.");
+    return;
+  }
+
+  const termine = privateTermineLaden();
+  termine.push({ datum, titel, notiz });
+  localStorage.setItem("meine_private_termine", JSON.stringify(termine));
+
+  document.getElementById("privatTitel").value = "";
+  document.getElementById("privatNotiz").value = "";
+    privateTermineAnzeigen();
+  });
+});
+
+</script>
+</script>
+ <script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/schichtkalender-2027/sw.js")
+      .catch(err => console.error("Service Worker konnte nicht registriert werden:", err));
+  });
+}
+  // Anonyme Besucherzählung
+async function kalenderBesuchSpeichern() {
+  try {
+    let geraetId = localStorage.getItem("kalender_geraet_id");
+
+    if (!geraetId) {
+      geraetId = crypto.randomUUID();
+      localStorage.setItem("kalender_geraet_id", geraetId);
+    }
+
+    await fetch(SUPABASE_URL + "/rest/v1/kalender_besuche", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + SUPABASE_KEY,
+        "Prefer": "return=minimal"
+      },
+      body: JSON.stringify({
+        geraet_id: geraetId
+      })
+    });
+  } catch (error) {
+    console.log("Besuch konnte nicht gespeichert werden:", error);
+  }
+}
+
+kalenderBesuchSpeichern();
+ </script>
+ <div class="panel" id="meinPrivatKalender">
+  <h3>Mein privater Kalender 🔒</h3>
+  <p class="muted">Nur auf diesem Handy sichtbar.</p>
+
+  <input type="date" id="privatDatum">
+  <input type="text" id="privatTitel"
+         placeholder="Was möchtest du eintragen?">
+  <textarea id="privatNotiz"
+            placeholder="Notiz (optional)"></textarea>
+
+  <button class="primary" id="privatSpeichern">
+    Speichern
+  </button>
+
+  <div id="privatTerminListe"></div>
+ </div>
+</body>
+</html>
