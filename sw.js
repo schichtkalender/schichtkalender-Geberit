@@ -1,13 +1,14 @@
-const CACHE_NAME = "schichtkalender-v2-push";
+
+const CACHE_NAME = "geberit-schichtkalender-v1";
 
 self.addEventListener("install", event => {
   event.waitUntil(
     caches.open(CACHE_NAME).then(cache =>
       cache.addAll([
-        "/schichtkalender-2027/",
-        "/schichtkalender-2027/manifest.json",
-        "/schichtkalender-2027/icon-192.png",
-        "/schichtkalender-2027/icon-512.png"
+        "/schichtkalender-Geberit/",
+        "/schichtkalender-Geberit/manifest.json",
+        "/schichtkalender-Geberit/icon-192.png",
+        "/schichtkalender-Geberit/icon-512.png"
       ])
     )
   );
@@ -24,9 +25,9 @@ self.addEventListener("activate", event => {
 
 self.addEventListener("push", event => {
   let data = {
-    title: "Schichtkalender",
+    title: "Geberit Schichtkalender",
     body: "Der Schichtkalender wurde geändert. Tippe hier, um ihn zu öffnen.",
-    url: "/schichtkalender-2027/"
+    url: "/schichtkalender-Geberit/"
   };
 
   try {
@@ -36,8 +37,8 @@ self.addEventListener("push", event => {
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
-      icon: "/schichtkalender-2027/icon-192.png",
-      badge: "/schichtkalender-2027/icon-192.png",
+      icon: "/schichtkalender-Geberit/icon-192.png",
+      badge: "/schichtkalender-Geberit/icon-192.png",
       data: { url: data.url }
     })
   );
@@ -46,14 +47,14 @@ self.addEventListener("push", event => {
 self.addEventListener("notificationclick", event => {
   event.notification.close();
   const target = new URL(
-    event.notification.data?.url || "/schichtkalender-2027/",
+    event.notification.data?.url || "/schichtkalender-Geberit/",
     self.location.origin
   ).href;
 
   event.waitUntil(
     self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(clients => {
       const existing = clients.find(client =>
-        client.url.startsWith(self.location.origin + "/schichtkalender-2027/")
+        client.url.startsWith(self.location.origin + "/schichtkalender-Geberit/")
       );
       if (existing) return existing.focus();
       return self.clients.openWindow(target);
