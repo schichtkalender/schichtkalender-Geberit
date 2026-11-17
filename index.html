@@ -176,9 +176,9 @@ function urlBase64ToUint8Array(base64String) {
     status.textContent = "Fehler: " + error.message;
   }
  }
-let year = FIRST_YEAR;
-let month = 0;
-let selected = null;
+let year = new Date().getFullYear();
+let month = new Date().getMonth();
+let selected = new Date();
 let user = null;
 let shifts = {};
 let infos = {};
