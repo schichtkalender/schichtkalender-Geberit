@@ -100,8 +100,8 @@ input,textarea{box-sizing:border-box;max-width:100%;width:100%;margin:5px 0}
 </div>
 
 <script>
-const SUPABASE_URL = "https://uvskcvpghxxzgcqjmkmt.supabase.co";
-const SUPABASE_KEY = "sb_publishable_9ITj_ZcBVgB8UinKXrej0g_S8BROev4";
+const SUPABASE_URL = "https://mhbzwecxgyuvkmzdgnks.supabase.co";
+const SUPABASE_KEY = "sb_publishable_CRzkG7ipbH4Tm6aTCUyLfw_T0G532dQ";
 
 const FIRST_YEAR = 2027;
 const LAST_YEAR = 2095;
@@ -521,10 +521,7 @@ $("signIn").onclick=async()=>{
   const login=$("email").value.trim().toLowerCase();
   const password=$("password").value;
 
-  const email = {
-    "kohpa": "kohpa@login.schichtkalender.invalid",
-    "bruma": "bruma@login.schichtkalender.invalid"
-  }[login] || login;
+  const email = login;
 
   const {error}=await db.auth.signInWithPassword({
     email,
