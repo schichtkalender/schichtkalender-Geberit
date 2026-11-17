@@ -178,7 +178,7 @@ function urlBase64ToUint8Array(base64String) {
  }
 let year = new Date().getFullYear();
 let month = new Date().getMonth();
-let selected = new Date();
+let selected = new Date().getFullYear() + "-" + String(new Date().getMonth()+1).padStart(2,"0") + "-" + String(new Date().getDate()).padStart(2,"0");
 let user = null;
 let shifts = {};
 let infos = {};
