@@ -511,6 +511,44 @@ function moveMonth(delta){
 }
 
 $("prev").onclick=()=>moveMonth(-1);
+ async function privateErinnerungPlanen(datum, uhrzeit, erinnerungMinuten) {
+  try {
+    const registration = await navigator.serviceWorker.ready;
+    const subscription = await registration.pushManager.getSubscription();
+
+    if (!subscription) {
+      console.log("Keine aktive Push-Anmeldung vorhanden.");
+      return;
+    }
+
+    const terminZeit = new Date(`${datum}T${uhrzeit}`);
+    const sendAt = new Date(
+      terminZeit.getTime() - erinnerungMinuten * 60000
+    );
+
+    const response = await fetch(
+      SUPABASE_URL + "/functions/v1/push-notify",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY
+        },
+        body: JSON.stringify({
+          action: "schedule-private",
+          endpoint: subscription.endpoint,
+          send_at: sendAt.toISOString()
+        })
+      }
+    );
+
+    if (!response.ok) {
+      console.error("Private Erinnerung konnte nicht geplant werden.");
+    }
+  } catch (error) {
+    console.error("Fehler bei privater Erinnerung:", error);
+  }
+ }
  document.addEventListener("DOMContentLoaded", () => {
   $("enablePush").onclick = enablePush;
 });
