@@ -613,11 +613,13 @@ function privateTermineAnzeigen() {
 document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("privatSpeichern").addEventListener("click", () => {
   const datum = document.getElementById("privatDatum").value;
+   const uhrzeit = document.getElementById("privatUhrzeit").value;
+const erinnerungMinuten = Number(document.getElementById("privatErinnerung").value);
   const titel = document.getElementById("privatTitel").value.trim();
   const notiz = document.getElementById("privatNotiz").value.trim();
 
   if (!datum || !titel) {
-    alert("Bitte Datum und Titel eingeben.");
+   alert("Bitte Datum, Uhrzeit und Titel eingeben.");
     return;
   }
 
@@ -673,6 +675,15 @@ kalenderBesuchSpeichern();
   <p class="muted">Nur auf diesem Handy sichtbar.</p>
 
   <input type="date" id="privatDatum">
+  <input type="time" id="privatUhrzeit">
+
+<select id="privatErinnerung">
+  <option value="10">10 Minuten vorher</option>
+  <option value="60">1 Stunde vorher</option>
+  <option value="120">2 Stunden vorher</option>
+  <option value="1440">1 Tag vorher</option>
+  <option value="2880">2 Tage vorher</option>
+</select>
   <input type="text" id="privatTitel"
          placeholder="Was möchtest du eintragen?">
   <textarea id="privatNotiz"
