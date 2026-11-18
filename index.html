@@ -618,7 +618,7 @@ const erinnerungMinuten = Number(document.getElementById("privatErinnerung").val
   const titel = document.getElementById("privatTitel").value.trim();
   const notiz = document.getElementById("privatNotiz").value.trim();
 
-  if (!datum || !titel) {
+  if (!datum || !uhrzeit || !titel) {
    alert("Bitte Datum, Uhrzeit und Titel eingeben.");
     return;
   }
