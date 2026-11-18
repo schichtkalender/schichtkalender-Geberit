@@ -663,8 +663,9 @@ const erinnerungMinuten = Number(document.getElementById("privatErinnerung").val
 
   const termine = privateTermineLaden();
   termine.push({ datum, uhrzeit, erinnerungMinuten, titel, notiz });
+   
   localStorage.setItem("meine_private_termine", JSON.stringify(termine));
-
+privateErinnerungPlanen(datum, uhrzeit, erinnerungMinuten);
   document.getElementById("privatTitel").value = "";
   document.getElementById("privatNotiz").value = "";
     privateTermineAnzeigen();
