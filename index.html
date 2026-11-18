@@ -593,7 +593,7 @@ function privateTermineAnzeigen() {
     const eintrag = document.createElement("div");
     eintrag.className = "panel";
     eintrag.textContent =
-      termin.datum + " – " + termin.titel +
+      termin.datum + " um " + (termin.uhrzeit || "keine Uhrzeit") + " Uhr – " + termin.titel +
       (termin.notiz ? " – " + termin.notiz : "");
 
     const loeschen = document.createElement("button");
