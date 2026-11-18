@@ -401,7 +401,8 @@ async function save(){
       : await db.from("schicht_infos").delete().eq("datum",selected);
 
     if(infResult.error)throw infResult.error;
-
+await sendPushNotification("Der Schichtplan wurde aktualisiert.");
+   
     $("status").textContent="Änderungen gespeichert.";
     await loadData();
     selectDay(selected);
@@ -410,6 +411,36 @@ async function save(){
   }
 }
 
+ async function sendPushNotification(message){
+  if(!db || !user) return;
+
+  const { data } = await db.auth.getSession();
+  const token = data.session?.access_token;
+
+  if(!token) return;
+
+  const response = await fetch(
+    SUPABASE_URL + "/functions/v1/push-notify",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_KEY,
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({
+        action: "send",
+        title: "Geberit-Schichtkalender",
+        body: message
+      })
+    }
+  );
+
+  if(!response.ok){
+    console.error("Push-Fehler:", await response.text());
+  }
+ }
+ 
 async function resetDay(){
   if(!user||!selected)return;
   try{
@@ -418,6 +449,7 @@ async function resetDay(){
     const b=await db.from("schicht_infos").delete().eq("datum",selected);
     if(b.error)throw b.error;
     await loadData();
+   await sendPushNotification("Ein Schichteintrag oder eine Schichtinfo wurde zurückgesetzt.");
     selectDay(selected);
   }catch(e){
     $("status").textContent="Zurücksetzen fehlgeschlagen: "+e.message;
